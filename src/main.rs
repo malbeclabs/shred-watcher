@@ -22,6 +22,11 @@ struct Cli {
     /// Number of parallel packet-processing workers
     #[arg(long, default_value_t = 4)]
     workers: usize,
+
+    /// Network interface to bind to (e.g. "eth0", "enp3s0").
+    /// Uses SO_BINDTODEVICE — requires root or CAP_NET_RAW.
+    #[arg(long)]
+    iface: Option<String>,
 }
 
 #[tokio::main]
@@ -44,7 +49,14 @@ async fn main() -> Result<()> {
     };
     set_socket_recv_buf(raw_fd, cli.recv_buf)?;
 
+    if let Some(ref iface) = cli.iface {
+        bind_to_iface(raw_fd, iface)?;
+    }
+
     info!("✅ Listening for shreds on {}", cli.bind);
+    if let Some(ref iface) = cli.iface {
+        info!("   Interface: {iface}");
+    }
     info!("   Socket buffer: {} MB", cli.recv_buf / 1024 / 1024);
     info!("   Workers: {}", cli.workers);
 
@@ -108,7 +120,7 @@ async fn process_packet(
 
             let mut asm = assembler.lock().await;
             if let Some(entries) = asm.push(shred) {
-                drop(asm); // liberar el lock antes de procesar
+                drop(asm); // release the lock before processing entries
                 for entry in entries {
                     for tx in entry.transactions {
                         if let Some(decoded) = jupiter::try_decode(&tx) {
@@ -122,6 +134,31 @@ async fn process_packet(
             warn!("[W{worker_id}] Invalid packet from {peer} ({} bytes): {e}", raw.len());
         }
     }
+}
+
+/// Binds the socket to a specific network interface via SO_BINDTODEVICE.
+/// Requires root or CAP_NET_RAW.
+fn bind_to_iface(fd: std::os::unix::io::RawFd, iface: &str) -> Result<()> {
+    use std::ffi::CString;
+    let name = CString::new(iface)?;
+    let ret = unsafe {
+        libc::setsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_BINDTODEVICE,
+            name.as_ptr() as *const libc::c_void,
+            iface.len() as libc::socklen_t,
+        )
+    };
+    if ret != 0 {
+        anyhow::bail!(
+            "Failed to bind to interface '{}' (requires root or CAP_NET_RAW): {}",
+            iface,
+            std::io::Error::last_os_error()
+        );
+    }
+    info!("   Bound to interface '{iface}' via SO_BINDTODEVICE");
+    Ok(())
 }
 
 /// Sets SO_RCVBUF on the socket to handle shred bursts without packet loss.
