@@ -38,6 +38,7 @@ shred-watcher [OPTIONS]
 
 Options:
   --bind <ADDR>       Listen address and port [default: 0.0.0.0:8001]
+  --iface <NAME>      Network interface to bind to, e.g. eth0 (requires root or CAP_NET_RAW)
   --recv-buf <BYTES>  Kernel socket receive buffer size [default: 268435456 (256 MB)]
   --workers <N>       Number of parallel packet-processing workers [default: 4]
   -h, --help          Print help
