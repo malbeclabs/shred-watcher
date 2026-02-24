@@ -52,8 +52,37 @@ Options:
 # Listen on a specific interface with 8 workers
 ./target/release/shred-watcher --bind 192.168.1.50:9000 --workers 8
 
+# Lock traffic to a specific NIC (requires root or CAP_NET_RAW)
+sudo ./target/release/shred-watcher --bind 0.0.0.0:8001 --iface eth0
+
 # Verbose logging
 RUST_LOG=debug ./target/release/shred-watcher
+```
+
+### Privileged ports (< 1024)
+
+Binding to ports below 1024 requires elevated privileges. Pick one option:
+
+**Option 1 — run with sudo** (simplest)
+```bash
+sudo ./target/release/shred-watcher --bind 0.0.0.0:1002
+```
+
+**Option 2 — grant the capability to the binary** (run without sudo after this)
+```bash
+sudo setcap cap_net_bind_service=+ep ./target/release/shred-watcher
+./target/release/shred-watcher --bind 0.0.0.0:1002
+```
+
+**Option 3 — lower the unprivileged port limit** (system-wide, resets on reboot)
+```bash
+sudo sysctl -w net.ipv4.ip_unprivileged_port_start=1000
+./target/release/shred-watcher --bind 0.0.0.0:1002
+```
+
+To make option 3 permanent, add it to `/etc/sysctl.conf`:
+```
+net.ipv4.ip_unprivileged_port_start=1000
 ```
 
 ## Output
