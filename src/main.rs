@@ -39,8 +39,24 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Bind del socket UDP
-    let socket = UdpSocket::bind(&cli.bind).await?;
+    // Bind the UDP socket
+    let socket = UdpSocket::bind(&cli.bind).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            if let Ok(addr) = cli.bind.parse::<std::net::SocketAddr>() {
+                if addr.port() < 1024 {
+                    return anyhow::anyhow!(
+                        "Cannot bind to {} — port {} is privileged (< 1024).\n\
+                         Run with sudo, or lower the limit:\n\
+                         \tsudo sysctl -w net.ipv4.ip_unprivileged_port_start={}",
+                        cli.bind, addr.port(), addr.port()
+                    );
+                }
+            }
+            anyhow::anyhow!("Permission denied binding to {} — try running with sudo", cli.bind)
+        } else {
+            anyhow::anyhow!("Failed to bind to {}: {}", cli.bind, e)
+        }
+    })?;
 
     // Increase the kernel receive buffer to avoid dropping packets under bursts
     let raw_fd = {
