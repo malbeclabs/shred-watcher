@@ -1,6 +1,4 @@
-mod shred;
-mod assembler;
-mod jupiter;
+use shred_watcher::{assembler, jupiter, shred};
 
 use anyhow::Result;
 use clap::Parser;

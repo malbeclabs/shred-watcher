@@ -22,6 +22,10 @@ clap           = { version = "4", features = ["derive"] }
 solana-sdk     = "1.18"
 solana-entry   = "1.18"
 
+[lib]
+name = "shred_watcher"
+path = "src/lib.rs"
+
 [[bin]]
 name = "shred-watcher"
 path = "src/main.rs"
